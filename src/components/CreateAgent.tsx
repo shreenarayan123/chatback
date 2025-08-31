@@ -27,7 +27,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { useAuthStore } from '@/store/globalStore'
+import { authClient } from '@/lib/auth-client'
 
 const formSchema = z.object({
   agentName: z.string().min(2, {
@@ -43,7 +43,7 @@ const CreateAgent = () => {
   const [loading, setLoading] = useState(false)
 
   const searchParams = useSearchParams()
-  const { user } = useAuthStore()
+  const { data: session } = authClient.useSession()
   const router = useRouter()
 
   useEffect(() => {
@@ -67,18 +67,24 @@ const CreateAgent = () => {
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("user :" , user);
+    console.log("session:", session);
+    
+    if (!session?.user?.id) {
+      toast.error('User not authenticated. Please log in again.')
+      return
+    }
+    
     try {
       setLoading(true)
       const newAgent = await createAgent(
-        user!.id, //ID ERROR IS HERE
+        session.user.id,
         values.agentName,
         values.agentDescription,
       )
 
       if (newAgent) {
         console.log('Agent create successfully', newAgent)
-        router.push(`/dashboard/train-agent/${newAgent.id}/file`)
+        router.push(`/dashboard/agents/train-agent/${newAgent.id}/file`)
       }
     } catch (error) {
       console.error('Error creating agent:', error)

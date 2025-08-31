@@ -3,7 +3,7 @@ import { ArrowLeft, File, Globe, MessageCircle, Text } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import NavLink from '@/components/common/NavLink'
 import { Button } from '@/components/ui/button'
-import { useAuthStore } from '@/store/globalStore'
+import { authClient } from '@/lib/auth-client'
 
 const trainOptions = [
   { option: 'File', icon: <File className="size-5" />, link: 'file' },
@@ -13,11 +13,16 @@ const trainOptions = [
 ]
 
 const CreateAgentLayout = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuthStore()
+  const { data: session } = authClient.useSession()
 
   const getData = async () => {
+    if (!session?.user?.id) {
+      console.error('User not authenticated')
+      return null
+    }
+    
     try {
-      const response = await fetch(`/api/subscription?userId=${user?.id}`)
+      const response = await fetch(`/api/subscription?userId=${session.user.id}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch subscription')
@@ -60,7 +65,7 @@ const CreateAgentLayout = ({ children }: { children: React.ReactNode }) => {
               className="w-full justify-start"
             >
               <NavLink
-                href={`/dashboard/train-agent/${agentId}/${option.link}`}
+                href={`/dashboard/agents/train-agent/${agentId}/${option.link}`}
                 className="font-semibold"
               >
                 {option.icon}

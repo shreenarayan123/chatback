@@ -27,7 +27,7 @@ const AgentList = ({ userId }: Props) => {
   const router = useRouter()
 
   function handleAgentClick(agentId: string) {
-    router.push(`/dashboard/train-agent/${agentId}/file`)
+    router.push(`/dashboard/agents/train-agent/${agentId}/file`)
   }
 
   console.log('userId from agentList: ', userId)
