@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+
+  // SaaS related
+  subscription Subscription?
+  agents       Agent[]
+  ChatMessage  ChatMessage[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+enum SubscriptionStatus {
+  active
+  canceled
+  trialing
+  incomplete
+  past_due
+}
+
+enum Plan {
+  free
+  hobby
+  pro
+  enterprise
+}
+
+model Subscription {
+  id               String              @id @default(cuid())
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  plan             Plan                @default(free) // "free","hobby" "pro", "enterprise"
+  credits          Int                 @default(100) // number of messages/user interactions allowed
+  creditsUsed      Int                 @default(0) // messages used
+  priceId          String? // Stripe price id (if using Stripe)
+  status           SubscriptionStatus? // "active", "canceled", etc.
+  startedAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  currentPeriodEnd DateTime?
+
+  @@unique([userId])
+  @@index([userId])
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // sources of knowledge
+
+  docs       Docs[] // S3/Cloud links to PDFs
+  webLinks   String[] // List of URLs
+  text       Text[] // Optional text source
+  chats      ChatMessage[]
+  qna        Qna[]
+  agentSize  AgentSize[]
+  usage      AgentUsage?
+  trainingAt DateTime?
+  apiKey     String        @unique
+  isTrained  Boolean       @default(false)
+}
+
+model Docs {
+  id        String   @id @default(cuid())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  url       String
+  name      String
+  size      Int
+  type      String
+  createdAt DateTime @default(now())
+
+  @@unique([agentId, url])
+}
+
+model Text {
+  id        String   @id @default(cuid())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@unique([agentId, content])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  role      Role // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Qna {
+  id        String   @id @default(cuid())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([agentId, question])
+}
+
+enum SourceType {
+  text
+  docs
+  qna
+}
+
+model AgentSize {
+  id         String     @id @default(cuid())
+  agent      Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId    String
+  sourceType SourceType // "text", "docs", "qna"
+  size       Int        @default(0)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([agentId, sourceType])
+}
+
+model AgentUsage {
+  id            String    @id @default(cuid())
+  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId       String    @unique
+  totalRequests Int       @default(0)
+  lastUsedAt    DateTime?
+}
+
+enum Role {
+  user
+  assistant
+}
